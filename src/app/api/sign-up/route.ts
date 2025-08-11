@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       return Response.json(
         {
           success: false,
-          message: `Username is alredy taken`,
+          message: "Username is already taken",
         },
         { status: 400 }
       );
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         return Response.json(
           {
             success: false,
-            message: `User already exists with this email`,
+            message: "User already exists with this email",
           },
           { status: 400 }
         );
@@ -55,8 +55,8 @@ export async function POST(request: Request) {
         verifyCode,
         verifyCodeExpiry: expiryDate,
         isVerified: false,
-        isAcceptingMessage: true,
-        message: [],
+        isAcceptingMessages: true,
+        messages: [],
       });
 
       await newUser.save();
@@ -81,16 +81,16 @@ export async function POST(request: Request) {
     return Response.json(
       {
         success: true,
-        message: `User registered successfully. Please verify your account`,
+        message: "User registered successfully. Please verify your account.",
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error(`Error while registering user ${error}`);
+    console.error("Error registering user:", error);
     return Response.json(
       {
         success: false,
-        message: `Error while registering user`,
+        message: "Error registering user",
       },
       { status: 500 }
     );
