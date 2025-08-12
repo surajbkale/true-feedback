@@ -83,14 +83,18 @@ const Page = () => {
                 </FormItem>
               )}
             />
-            <Button type="submit">Signin</Button>
+            <div className="flex w-full justify-center">
+              <Button type="submit" className="px-8">
+                Sign in
+              </Button>
+            </div>
           </form>
         </Form>
         <div className="text-center mt-4">
           <p>
-            Already a member?{" "}
-            <Link href="/sign-in" className="text-blue-600 hover:text-blue-800">
-              Sign in
+            {"Don't have account?"}{" "}
+            <Link href="/sign-up" className="text-blue-600 hover:text-blue-800">
+              Sign up
             </Link>
           </p>
         </div>
