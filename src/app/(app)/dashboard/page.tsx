@@ -91,8 +91,15 @@ const Page = () => {
     }
   };
 
-  const { username } = session?.user as User;
-  const baseUrl = `${window.location.protocol}://${window.location.host}`;
+  // const { username } = session?.user;
+  const username = session?.user?.username;
+
+  // const baseUrl = `${window.location.protocol}//${window.location.host}`;
+  const baseUrl =
+    typeof window !== "undefined"
+      ? `${window.location.protocol}//${window.location.host}`
+      : "";
+
   const profileUrl = `${baseUrl}/u/${username}`;
 
   const useCopyToClipboard = () => {
@@ -101,7 +108,11 @@ const Page = () => {
   };
 
   if (!session || !session.user) {
-    return <div>Please Login</div>;
+    return (
+      <div className="flex items-center justify-center text-4xl font-black m-10">
+        Please Login
+      </div>
+    );
   }
 
   return (
