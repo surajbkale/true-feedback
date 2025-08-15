@@ -80,7 +80,8 @@ export default function SendMessages() {
       } else {
         toast.error("Error while fetching messages");
       }
-    } catch (error) {
+    } catch (e) {
+      console.error("Error while fetching messages", e);
       toast.error("Error fetching messages");
     } finally {
       setIsSuggestLoading(false);
