@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { User } from "next-auth";
 import UserModel from "@/model/User";
-import { _success } from "zod/v4/core";
 
 export async function DELETE(
   request: Request,
