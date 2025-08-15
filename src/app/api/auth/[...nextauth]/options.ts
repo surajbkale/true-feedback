@@ -19,6 +19,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
 
+      //@ts-expect-error: value can be null at runtime; guarded elsewhere
       async authorize(credentials: Credentials): Promise<User | null> {
         await dbConnect();
         try {
