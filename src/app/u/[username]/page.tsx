@@ -146,20 +146,22 @@ export default function SendMessages() {
           <CardHeader>
             <h3 className="text-xl font-semibold">Messages</h3>
           </CardHeader>
-          <CardContent className="flex flex-col space-y-4">
+          <CardContent>
             {suggestedMessages.length > 0 ? (
-              suggestedMessages.map((msg, index) => (
-                <Button
-                  key={index}
-                  variant={"outline"}
-                  className="mb-2"
-                  onClick={() => handleMessageClick(msg)}
-                >
-                  {msg}
-                </Button>
-              ))
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {suggestedMessages.map((msg, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    className="h-auto whitespace-normal text-left p-3 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200"
+                    onClick={() => handleMessageClick(msg)}
+                  >
+                    {msg}
+                  </Button>
+                ))}
+              </div>
             ) : (
-              <p className="text-gray-500">No Suggested message yet.</p>
+              <p className="text-gray-500">No suggested messages yet.</p>
             )}
           </CardContent>
         </Card>
