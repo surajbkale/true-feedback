@@ -11,7 +11,7 @@ interface DeleteParams {
 }
 
 export async function DELETE(request: Request, context: DeleteParams) {
-  const { messageId } = await context.params;
+  const { messageId } = context.params;
   await dbConnect();
   const session = await getServerSession(authOptions);
   const _user: User = session?.user;
