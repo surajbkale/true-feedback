@@ -162,7 +162,7 @@ export default function SendMessages() {
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500">No suggested messages yet.</p>
+              <p className="text-gray-500">No suggested messages yet</p>
             )}
           </CardContent>
         </Card>
