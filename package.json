@@ -8,7 +8,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "15.4.5",
+    "next": "15.4.10",
     "@ai-sdk/google": "^2.0.6",
     "@ai-sdk/react": "^2.0.12",
     "@google/genai": "^1.13.0",
