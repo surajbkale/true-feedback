@@ -6,10 +6,11 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import axios, { AxiosError } from "axios";
-import { Loader2, RefreshCcw } from "lucide-react";
+import { AxiosError } from "axios";
+import { Loader2, RefreshCcw, Wifi, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -42,10 +43,36 @@ const Page = () => {
   const [isSwitchLoading, setIsSwitchLoading] = useState(false);
 
   const { authUser } = useAuth();
+  const {
+    liveMessages,
+    clearLiveMessages,
+    markAllRead,
+    isConnected,
+  } = useNotifications();
 
   const form = useForm({ resolver: zodResolver(acceptMessageSchema) });
   const { register, watch, setValue } = form;
   const acceptMessages = watch("acceptMessage");
+
+  // ── Merge incoming SSE messages into the main list ─────────────────────
+  useEffect(() => {
+    if (liveMessages.length === 0) return;
+
+    setMessages((prev) => {
+      // Deduplicate by _id before prepending
+      const existingIds = new Set(prev.map((m) => m._id));
+      const fresh = liveMessages.filter((m) => !existingIds.has(m._id));
+      return [...fresh, ...prev];
+    });
+
+    clearLiveMessages(); // consumed — clear the context buffer
+    markAllRead();       // user can see them, reset badge
+  }, [liveMessages, clearLiveMessages, markAllRead]);
+
+  // Mark all as read when dashboard mounts / gains focus
+  useEffect(() => {
+    markAllRead();
+  }, [markAllRead]);
 
   // ── Fetch accept-message setting ─────────────────────────────────────────
   const fetchAcceptMessage = useCallback(async () => {
@@ -62,22 +89,19 @@ const Page = () => {
   }, [setValue]);
 
   // ── Fetch messages ────────────────────────────────────────────────────────
-  const fetchMessages = useCallback(
-    async (refresh = false) => {
-      setIsLoading(true);
-      try {
-        const res = await api.get<MessagesResponse>("/api/messages");
-        setMessages(res.data.data ?? []);
-        if (refresh) toast.success("Showing latest messages");
-      } catch (error) {
-        const axiosError = error as AxiosError<{ message: string }>;
-        toast.error(axiosError.response?.data?.message ?? "Failed to fetch messages");
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    []
-  );
+  const fetchMessages = useCallback(async (refresh = false) => {
+    setIsLoading(true);
+    try {
+      const res = await api.get<MessagesResponse>("/api/messages");
+      setMessages(res.data.data ?? []);
+      if (refresh) toast.success("Showing latest messages");
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast.error(axiosError.response?.data?.message ?? "Failed to fetch messages");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchMessages();
@@ -119,7 +143,23 @@ const Page = () => {
 
   return (
     <div className="my-8 mx-4 md:mx-8 lg:mx-auto p-6 bg-white rounded w-full max-w-6xl">
-      <h1 className="text-4xl font-bold mb-4">User Dashboard</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-4xl font-bold">User Dashboard</h1>
+        {/* SSE connection status indicator */}
+        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+          {isConnected ? (
+            <>
+              <Wifi className="h-3.5 w-3.5 text-green-500" />
+              <span className="text-green-600">Live</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-3.5 w-3.5 text-gray-400" />
+              <span>Reconnecting…</span>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Profile link */}
       <div className="mb-4">
