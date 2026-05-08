@@ -19,13 +19,13 @@ import {
 import dayjs from "dayjs";
 import { Button } from "./ui/button";
 import { X } from "lucide-react";
-import { Message } from "@/model/User";
+import { IMessage } from "@/model/Message";
 import { toast } from "sonner";
 import axios, { AxiosError } from "axios";
 import { ApiResponse } from "@/types/ApiResponse";
 
 type MessageCardProps = {
-  message: Message;
+  message: IMessage;
   onMessageDelete: (messageId: string) => void;
 };
 
@@ -33,7 +33,7 @@ export function MessageCard({ message, onMessageDelete }: MessageCardProps) {
   const handleDeleteConfirm = async () => {
     try {
       const response = await axios.delete<ApiResponse>(
-        `api/delete-message/${message._id}`
+        `/api/delete-message/${message._id}`
       );
 
       toast.success(response.data.message);

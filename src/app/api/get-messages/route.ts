@@ -1,9 +1,9 @@
 import dbConnect from "@/lib/dbConnect";
+import MessageModel from "@/model/Message";
 import UserModel from "@/model/User";
-import mongoose from "mongoose";
-import { User } from "next-auth";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/options";
+import { User } from "next-auth";
 
 export async function GET() {
   await dbConnect();
@@ -17,49 +17,28 @@ export async function GET() {
     );
   }
 
-  const userId = new mongoose.Types.ObjectId(_user._id);
   try {
-    const user = await UserModel.aggregate([
-      { $match: { _id: userId } },
-      { $unwind: "$messages" },
-      { $sort: { "messages.createdAt": -1 } },
-      { $group: { _id: "$_id", messages: { $push: "$messages" } } },
-    ]).exec();
-
+    // Verify the user exists
+    const user = await UserModel.findById(_user._id).lean();
     if (!user) {
       return Response.json(
-        {
-          success: false,
-          message: "User not found",
-        },
+        { success: false, message: "User not found" },
         { status: 404 }
       );
     }
 
-    if (user.length === 0) {
-      return Response.json(
-        {
-          success: false,
-          message: "No messages to show",
-        },
-        { status: 404 }
-      );
-    }
+    const messages = await MessageModel.find({ userId: _user._id })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return Response.json(
-      {
-        success: true,
-        messages: user[0].messages,
-      },
+      { success: true, messages },
       { status: 200 }
     );
   } catch (error) {
     console.error(`An unexpected error occurred: ${error}`);
     return Response.json(
-      {
-        success: false,
-        message: `Internal server error`,
-      },
+      { success: false, message: "Internal server error" },
       { status: 500 }
     );
   }

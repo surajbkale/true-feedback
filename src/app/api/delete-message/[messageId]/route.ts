@@ -2,13 +2,7 @@ import dbConnect from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { User } from "next-auth";
-import UserModel from "@/model/User";
-
-// interface DeleteParams {
-//   params: {
-//     messageId: string;
-//   };
-// }
+import MessageModel from "@/model/Message";
 
 export async function DELETE(
   request: Request,
@@ -21,21 +15,19 @@ export async function DELETE(
 
   if (!session || !_user) {
     return Response.json(
-      {
-        success: false,
-        message: "Not authenticated",
-      },
+      { success: false, message: "Not authenticated" },
       { status: 401 }
     );
   }
 
   try {
-    const updateResult = await UserModel.updateOne(
-      { _id: _user._id },
-      { $pull: { messages: { _id: messageId } } }
-    );
+    // Only delete if the message belongs to this user (prevents deleting others' messages)
+    const result = await MessageModel.findOneAndDelete({
+      _id: messageId,
+      userId: _user._id,
+    });
 
-    if (updateResult.modifiedCount === 0) {
+    if (!result) {
       return Response.json(
         { success: false, message: "Message not found or already deleted" },
         { status: 404 }
@@ -43,10 +35,7 @@ export async function DELETE(
     }
 
     return Response.json(
-      {
-        success: true,
-        message: "Message deleted",
-      },
+      { success: true, message: "Message deleted" },
       { status: 200 }
     );
   } catch (error) {
