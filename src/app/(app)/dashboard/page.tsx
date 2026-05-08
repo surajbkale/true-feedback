@@ -3,7 +3,7 @@ import MessageCard from "@/components/MessageCard";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Message } from "@/model/User";
+import { IMessage } from "@/model/Message";
 import { acceptMessageSchema } from "@/schemas/acceptMessageSchema";
 import { ApiResponse } from "@/types/ApiResponse";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +15,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 const Page = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<IMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSwitchLoading, setIsSwitchLoading] = useState(false);
 
@@ -86,7 +86,7 @@ const Page = () => {
       toast.success(repoonse.data.message);
     } catch (error) {
       const axiosError = error as AxiosError<ApiResponse>;
-      toast.error(axiosError.request?.data.message);
+      toast.error(axiosError.response?.data.message ?? "Failed to update message settings");
     }
   };
 
