@@ -1,6 +1,7 @@
 "use client";
 
 import MessageCard from "@/components/MessageCard";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -184,6 +185,11 @@ const Page = () => {
           disabled={isSwitchLoading}
         />
         <span>Accept Messages: {acceptMessages ? "On" : "Off"}</span>
+      </div>
+
+      {/* Notification preference */}
+      <div className="mb-6">
+        <NotificationSettings />
       </div>
 
       <Separator />
