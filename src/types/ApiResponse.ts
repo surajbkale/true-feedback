@@ -1,8 +1,6 @@
-import { IMessage } from "@/model/Message";
-
-export interface ApiResponse {
+// Generic backend response shape — matches { success, message, data? }
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;
-  isAcceptingMessages?: boolean;
-  messages?: Array<IMessage>;
+  data?: T;
 }
