@@ -1,8 +1,8 @@
 "use client";
 
-import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/context/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
@@ -29,12 +29,16 @@ export default function AppLayout({
     );
   }
 
-  if (!authUser) return null; // redirect in progress
+  if (!authUser) return null;
 
   return (
-    <main>
-      <Navbar />
-      {children}
-    </main>
+    // NotificationProvider lives here so both Navbar (badge) and
+    // Dashboard (live messages) share the same SSE state
+    <NotificationProvider>
+      <main>
+        <Navbar />
+        {children}
+      </main>
+    </NotificationProvider>
   );
 }
