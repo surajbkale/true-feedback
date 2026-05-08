@@ -19,16 +19,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import * as z from "zod";
-import { ApiResponse } from "@/types/ApiResponse";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { messageSchema } from "@/schemas/messageSchema";
 
+const BACKEND = process.env["NEXT_PUBLIC_BACKEND_URL"] ?? "http://localhost:8000";
 const specialChar = "||";
 
-const parseStringMessages = (messageString: string): string[] => {
-  return messageString.split(specialChar);
-};
+const parseStringMessages = (messageString: string): string[] =>
+  messageString.split(specialChar).map((s) => s.trim()).filter(Boolean);
 
 export default function SendMessages() {
   const params = useParams<{ username: string }>();
@@ -36,6 +35,7 @@ export default function SendMessages() {
 
   const [suggestedMessages, setSuggestedMessages] = useState<string[]>([]);
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof messageSchema>>({
     resolver: zodResolver(messageSchema),
@@ -47,28 +47,27 @@ export default function SendMessages() {
     form.setValue("content", message);
   };
 
-  const [isLoading, setIsLoading] = useState(false);
-
+  // ── Send anonymous message → Express backend ───────────────────────────────
   const onSubmit = async (data: z.infer<typeof messageSchema>) => {
     setIsLoading(true);
     try {
-      const response = await axios.post<ApiResponse>("/api/send-message", {
-        ...data,
-        username,
-      });
-
+      const response = await axios.post<{ success: boolean; message: string }>(
+        `${BACKEND}/api/messages/send/${username}`,
+        { content: data.content }
+      );
       toast.success(response.data.message);
-      form.reset({ ...form.getValues(), content: "" });
+      form.reset({ content: "" });
     } catch (error) {
-      const axiosError = error as AxiosError<ApiResponse>;
+      const axiosError = error as AxiosError<{ message: string }>;
       toast.error(
-        axiosError.response?.data.message ?? "Failed to send message"
+        axiosError.response?.data?.message ?? "Failed to send message"
       );
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ── AI-suggested questions → Next.js API route (Gemini stays in FE) ────────
   const fetchSuggestedMessages = async () => {
     try {
       setIsSuggestLoading(true);
@@ -76,13 +75,13 @@ export default function SendMessages() {
       if (typeof res.data === "string") {
         setSuggestedMessages(parseStringMessages(res.data));
       } else if (res.data?.message) {
-        setSuggestedMessages(parseStringMessages(res.data.messages));
+        setSuggestedMessages(parseStringMessages(res.data.message));
       } else {
-        toast.error("Error while fetching messages");
+        toast.error("Error while fetching suggestions");
       }
     } catch (e) {
-      console.error("Error while fetching messages", e);
-      toast.error("Error fetching messages");
+      console.error("Error fetching suggestions", e);
+      toast.error("Error fetching suggested messages");
     } finally {
       setIsSuggestLoading(false);
     }
@@ -94,9 +93,8 @@ export default function SendMessages() {
 
   return (
     <div className="container mx-auto my-8 p-6 bg-white rounded max-w-4xl">
-      <h1 className="text-4xl font-bold mb-6 text-center">
-        Public Profile Link
-      </h1>
+      <h1 className="text-4xl font-bold mb-6 text-center">Public Profile Link</h1>
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -118,20 +116,21 @@ export default function SendMessages() {
           />
 
           <div className="flex justify-center">
-            {isLoading ? (
-              <Button disabled>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Please wait
-              </Button>
-            ) : (
-              <Button type="submit" disabled={isLoading || !messageContent}>
-                Send It
-              </Button>
-            )}
+            <Button type="submit" disabled={isLoading || !messageContent}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                "Send It"
+              )}
+            </Button>
           </div>
         </form>
       </Form>
 
+      {/* AI suggestions */}
       <div className="space-y-4 my-8">
         <div className="space-y-2">
           <Button
@@ -139,13 +138,13 @@ export default function SendMessages() {
             className="my-4"
             disabled={isSuggestLoading}
           >
-            {isSuggestLoading ? "Loading..." : "Suggest Messages"}
+            {isSuggestLoading ? "Loading…" : "Suggest Messages"}
           </Button>
           <p>Click on any message below to select it.</p>
         </div>
         <Card>
           <CardHeader>
-            <h3 className="text-xl font-semibold">Messages</h3>
+            <h3 className="text-xl font-semibold">Suggestions</h3>
           </CardHeader>
           <CardContent>
             {suggestedMessages.length > 0 ? (
@@ -154,7 +153,7 @@ export default function SendMessages() {
                   <Button
                     key={index}
                     variant="outline"
-                    className="h-auto whitespace-normal text-left p-3 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200"
+                    className="h-auto whitespace-normal text-left p-3 rounded-xl"
                     onClick={() => handleMessageClick(msg)}
                   >
                     {msg}
@@ -162,7 +161,7 @@ export default function SendMessages() {
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500">No suggested messages yet.</p>
+              <p className="text-gray-500">No suggestions yet.</p>
             )}
           </CardContent>
         </Card>
@@ -170,8 +169,8 @@ export default function SendMessages() {
 
       <Separator className="my-6" />
       <div className="text-center">
-        <div className="mb-4">Get Your message Board</div>
-        <Link href={"/sign-up"}>
+        <div className="mb-4">Get your own message board</div>
+        <Link href="/sign-up">
           <Button>Create Your Account</Button>
         </Link>
       </div>
