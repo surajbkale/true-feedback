@@ -3,6 +3,7 @@
 import MessageCard, { type Message } from "@/components/MessageCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
+import { ProfileSettings } from "@/components/ProfileSettings";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
@@ -278,7 +279,11 @@ const Page = () => {
           </div>
         </div>
 
+        {/* ── Profile customization ────────────────────────────────────────── */}
+        <ProfileSettings />
+
         {/* ── Tab bar ─────────────────────────────────────────────────────── */}
+
         <div className="mb-6 flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1 w-fit">
           {tabs.map((tab) => (
             <button
