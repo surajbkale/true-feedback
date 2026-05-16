@@ -2,6 +2,7 @@
 
 import MessageCard from "@/components/MessageCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -11,7 +12,7 @@ import { useNotifications } from "@/context/NotificationContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AxiosError } from "axios";
-import { Loader2, RefreshCcw, Wifi, WifiOff } from "lucide-react";
+import { Loader2, RefreshCcw, Wifi, WifiOff, BarChart2, Inbox } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -37,11 +38,14 @@ const acceptMessageSchema = z.object({
   acceptMessage: z.boolean(),
 });
 
+type Tab = "messages" | "analytics";
+
 // ── Component ──────────────────────────────────────────────────────────────
 const Page = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSwitchLoading, setIsSwitchLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("messages");
 
   const { authUser } = useAuth();
   const {
@@ -58,24 +62,20 @@ const Page = () => {
   // ── Merge incoming SSE messages into the main list ─────────────────────
   useEffect(() => {
     if (liveMessages.length === 0) return;
-
     setMessages((prev) => {
-      // Deduplicate by _id before prepending
       const existingIds = new Set(prev.map((m) => m._id));
       const fresh = liveMessages.filter((m) => !existingIds.has(m._id));
       return [...fresh, ...prev];
     });
-
-    clearLiveMessages(); // consumed — clear the context buffer
-    markAllRead();       // user can see them, reset badge
+    clearLiveMessages();
+    markAllRead();
   }, [liveMessages, clearLiveMessages, markAllRead]);
 
-  // Mark all as read when dashboard mounts / gains focus
   useEffect(() => {
     markAllRead();
   }, [markAllRead]);
 
-  // ── Fetch accept-message setting ─────────────────────────────────────────
+  // ── Fetch settings ────────────────────────────────────────────────────────
   const fetchAcceptMessage = useCallback(async () => {
     setIsSwitchLoading(true);
     try {
@@ -109,7 +109,6 @@ const Page = () => {
     fetchAcceptMessage();
   }, [fetchMessages, fetchAcceptMessage]);
 
-  // ── Toggle accept-messages ────────────────────────────────────────────────
   const handleSwitchChange = async () => {
     try {
       const res = await api.patch<AcceptResponse>("/api/users/accept-messages", {
@@ -119,18 +118,14 @@ const Page = () => {
       toast.success("Setting updated");
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
-      toast.error(
-        axiosError.response?.data?.message ?? "Failed to update message settings"
-      );
+      toast.error(axiosError.response?.data?.message ?? "Failed to update setting");
     }
   };
 
-  // ── Delete handler ────────────────────────────────────────────────────────
   const handleDeleteMessage = (messageId: string) => {
     setMessages((prev) => prev.filter((m) => m._id !== messageId));
   };
 
-  // ── Profile link ──────────────────────────────────────────────────────────
   const baseUrl =
     typeof window !== "undefined"
       ? `${window.location.protocol}//${window.location.host}`
@@ -144,9 +139,9 @@ const Page = () => {
 
   return (
     <div className="my-8 mx-4 md:mx-8 lg:mx-auto p-6 bg-white rounded w-full max-w-6xl">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-4xl font-bold">User Dashboard</h1>
-        {/* SSE connection status indicator */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-4xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-1.5 text-xs text-gray-500">
           {isConnected ? (
             <>
@@ -162,68 +157,108 @@ const Page = () => {
         </div>
       </div>
 
-      {/* Profile link */}
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold mb-2">Copy your unique link</h2>
+      {/* ── Profile link ─────────────────────────────────────────────────── */}
+      <div className="mb-5">
+        <h2 className="text-sm font-semibold text-gray-600 mb-2">Your public link</h2>
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={profileUrl}
             disabled
-            className="input input-bordered w-full p-2 border rounded"
+            className="w-full p-2 text-sm border rounded bg-gray-50 text-gray-600"
           />
-          <Button onClick={copyToClipboard}>Copy</Button>
+          <Button onClick={copyToClipboard} size="sm">Copy</Button>
         </div>
       </div>
 
-      {/* Accept messages toggle */}
-      <div className="mb-4 flex items-center gap-2">
-        <Switch
-          {...register("acceptMessage")}
-          checked={acceptMessages}
-          onCheckedChange={handleSwitchChange}
-          disabled={isSwitchLoading}
-        />
-        <span>Accept Messages: {acceptMessages ? "On" : "Off"}</span>
-      </div>
-
-      {/* Notification preference */}
-      <div className="mb-6">
+      {/* ── Accept messages + notification settings ───────────────────────── */}
+      <div className="mb-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <Switch
+            {...register("acceptMessage")}
+            checked={acceptMessages}
+            onCheckedChange={handleSwitchChange}
+            disabled={isSwitchLoading}
+          />
+          <span className="text-sm text-gray-700">
+            Accept Messages: <strong>{acceptMessages ? "On" : "Off"}</strong>
+          </span>
+        </div>
         <NotificationSettings />
       </div>
 
-      <Separator />
+      <Separator className="mb-5" />
 
-      {/* Refresh */}
-      <Button
-        className="mt-4"
-        variant="outline"
-        onClick={(e) => {
-          e.preventDefault();
-          fetchMessages(true);
-        }}
-      >
-        {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <RefreshCcw className="h-4 w-4" />
-        )}
-      </Button>
-
-      {/* Messages grid */}
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {messages.length > 0 ? (
-          messages.map((message) => (
-            <MessageCard
-              key={message._id}
-              message={message}
-              onMessageDelete={handleDeleteMessage}
-            />
-          ))
-        ) : (
-          <p className="text-gray-500">No messages to display</p>
-        )}
+      {/* ── Tab bar ──────────────────────────────────────────────────────── */}
+      <div className="flex gap-1 mb-6 border-b border-gray-100">
+        {(["messages", "analytics"] as Tab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={[
+              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors",
+              activeTab === tab
+                ? "border-indigo-500 text-indigo-600"
+                : "border-transparent text-gray-500 hover:text-gray-700",
+            ].join(" ")}
+          >
+            {tab === "messages" ? (
+              <>
+                <Inbox className="h-4 w-4" />
+                Messages
+                {messages.length > 0 && (
+                  <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                    {messages.length}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <BarChart2 className="h-4 w-4" />
+                Analytics
+              </>
+            )}
+          </button>
+        ))}
       </div>
+
+      {/* ── Tab content ──────────────────────────────────────────────────── */}
+      {activeTab === "messages" && (
+        <>
+          <Button
+            className="mb-4"
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.preventDefault();
+              fetchMessages(true);
+            }}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCcw className="h-4 w-4" />
+            )}
+            <span className="ml-2">Refresh</span>
+          </Button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {messages.length > 0 ? (
+              messages.map((message) => (
+                <MessageCard
+                  key={message._id}
+                  message={message}
+                  onMessageDelete={handleDeleteMessage}
+                />
+              ))
+            ) : (
+              <p className="text-gray-400 text-sm">No messages yet. Share your link!</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === "analytics" && <AnalyticsDashboard />}
     </div>
   );
 };
