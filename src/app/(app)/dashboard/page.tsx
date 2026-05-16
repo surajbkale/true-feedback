@@ -4,6 +4,7 @@ import MessageCard, { type Message } from "@/components/MessageCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import { ProfileSettings } from "@/components/ProfileSettings";
+import { ShareButtons } from "@/components/ShareButtons";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
@@ -224,12 +225,13 @@ const Page = () => {
           </div>
         </div>
 
-        {/* ── Profile link card ───────────────────────────────────────────── */}
+        {/* ── Profile link + share card ──────────────────────────────────── */}
         <div className="glass-card glow-border mb-6 p-5">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <Link2 className="h-4 w-4 text-indigo-400" />
             Your public link
           </div>
+          {/* URL + copy row */}
           <div className="flex items-center gap-2">
             <div className="flex-1 overflow-hidden rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-muted-foreground truncate">
               {profileUrl}
@@ -251,7 +253,17 @@ const Page = () => {
               )}
             </Button>
           </div>
+          {/* Share row */}
+          <div className="mt-3 flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Share via</span>
+            <ShareButtons
+              profileUrl={profileUrl}
+              username={authUser?.username ?? ""}
+              compact
+            />
+          </div>
         </div>
+
 
         {/* ── Settings ────────────────────────────────────────────────────── */}
         <div className="glass-card mb-6 p-5">
