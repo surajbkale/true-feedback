@@ -1,6 +1,6 @@
 "use client";
 
-import MessageCard from "@/components/MessageCard";
+import MessageCard, { type Message } from "@/components/MessageCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import { Button } from "@/components/ui/button";
@@ -22,18 +22,13 @@ import {
   Check,
   Link2,
   Settings2,
+  Star,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-// ── Types ──────────────────────────────────────────────────────────────────
-interface Message {
-  _id: string;
-  content: string;
-  createdAt: string;
-}
-
+// ── Types ──────────────────────────────────────────────────────────────────────
 interface MessagesResponse {
   success: boolean;
   data: Message[];
@@ -48,9 +43,9 @@ const acceptMessageSchema = z.object({
   acceptMessage: z.boolean(),
 });
 
-type Tab = "messages" | "analytics";
+type Tab = "messages" | "starred" | "analytics";
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ── Component ──────────────────────────────────────────────────────────────────
 const Page = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,18 +54,13 @@ const Page = () => {
   const [copied, setCopied] = useState(false);
 
   const { authUser } = useAuth();
-  const {
-    liveMessages,
-    clearLiveMessages,
-    markAllRead,
-    isConnected,
-  } = useNotifications();
+  const { liveMessages, clearLiveMessages, markAllRead, isConnected } = useNotifications();
 
   const form = useForm({ resolver: zodResolver(acceptMessageSchema) });
   const { register, watch, setValue } = form;
   const acceptMessages = watch("acceptMessage");
 
-  // ── Merge incoming SSE messages into the main list ─────────────────────
+  // ── Merge incoming SSE messages ─────────────────────────────────────────────
   useEffect(() => {
     if (liveMessages.length === 0) return;
     setMessages((prev) => {
@@ -82,11 +72,9 @@ const Page = () => {
     markAllRead();
   }, [liveMessages, clearLiveMessages, markAllRead]);
 
-  useEffect(() => {
-    markAllRead();
-  }, [markAllRead]);
+  useEffect(() => { markAllRead(); }, [markAllRead]);
 
-  // ── Fetch settings ────────────────────────────────────────────────────────
+  // ── Fetch settings ──────────────────────────────────────────────────────────
   const fetchAcceptMessage = useCallback(async () => {
     setIsSwitchLoading(true);
     try {
@@ -100,7 +88,7 @@ const Page = () => {
     }
   }, [setValue]);
 
-  // ── Fetch messages ────────────────────────────────────────────────────────
+  // ── Fetch messages ──────────────────────────────────────────────────────────
   const fetchMessages = useCallback(async (refresh = false) => {
     setIsLoading(true);
     try {
@@ -120,6 +108,25 @@ const Page = () => {
     fetchAcceptMessage();
   }, [fetchMessages, fetchAcceptMessage]);
 
+  // ── Derived lists ───────────────────────────────────────────────────────────
+  // Pinned messages always float to the top, then sort by date
+  const sortedMessages = useMemo(
+    () => [...messages].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }),
+    [messages]
+  );
+
+  const starredMessages = useMemo(
+    () => sortedMessages.filter((m) => m.isStarred),
+    [sortedMessages]
+  );
+
+  const starredCount = starredMessages.length;
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleSwitchChange = async () => {
     try {
       const res = await api.patch<AcceptResponse>("/api/users/accept-messages", {
@@ -137,6 +144,13 @@ const Page = () => {
     setMessages((prev) => prev.filter((m) => m._id !== messageId));
   };
 
+  // Patch a single message in local state after star/pin toggle
+  const handleMessageUpdate = (messageId: string, patch: Partial<Message>) => {
+    setMessages((prev) =>
+      prev.map((m) => (m._id === messageId ? { ...m, ...patch } : m))
+    );
+  };
+
   const baseUrl =
     typeof window !== "undefined"
       ? `${window.location.protocol}//${window.location.host}`
@@ -149,6 +163,29 @@ const Page = () => {
     toast.success("Link copied!");
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // ── Tab config ─────────────────────────────────────────────────────────────
+  const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
+    {
+      id: "messages",
+      label: "Messages",
+      icon: <Inbox className="h-4 w-4" />,
+      badge: messages.length || undefined,
+    },
+    {
+      id: "starred",
+      label: "Starred",
+      icon: <Star className="h-4 w-4" />,
+      badge: starredCount || undefined,
+    },
+    {
+      id: "analytics",
+      label: "Analytics",
+      icon: <BarChart2 className="h-4 w-4" />,
+    },
+  ];
+
+  const displayMessages = activeTab === "starred" ? starredMessages : sortedMessages;
 
   return (
     <div className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
@@ -163,13 +200,11 @@ const Page = () => {
             </p>
           </div>
           {/* Live indicator */}
-          <div
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border ${
-              isConnected
-                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                : "bg-white/5 border-white/10 text-muted-foreground"
-            }`}
-          >
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border ${
+            isConnected
+              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+              : "bg-white/5 border-white/10 text-muted-foreground"
+          }`}>
             {isConnected ? (
               <>
                 <span className="relative flex h-2 w-2">
@@ -188,7 +223,7 @@ const Page = () => {
           </div>
         </div>
 
-        {/* ── Profile link card ─────────────────────────────────────────────── */}
+        {/* ── Profile link card ───────────────────────────────────────────── */}
         <div className="glass-card glow-border mb-6 p-5">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <Link2 className="h-4 w-4 text-indigo-400" />
@@ -209,21 +244,15 @@ const Page = () => {
               }`}
             >
               {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 mr-1.5" />
-                  Copied!
-                </>
+                <><Check className="h-3.5 w-3.5 mr-1.5" />Copied!</>
               ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
-                  Copy
-                </>
+                <><Copy className="h-3.5 w-3.5 mr-1.5" />Copy</>
               )}
             </Button>
           </div>
         </div>
 
-        {/* ── Accept messages + notification settings ───────────────────────── */}
+        {/* ── Settings ────────────────────────────────────────────────────── */}
         <div className="glass-card mb-6 p-5">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <Settings2 className="h-4 w-4 text-indigo-400" />
@@ -249,94 +278,105 @@ const Page = () => {
           </div>
         </div>
 
-        {/* ── Tab bar ──────────────────────────────────────────────────────── */}
+        {/* ── Tab bar ─────────────────────────────────────────────────────── */}
         <div className="mb-6 flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1 w-fit">
-          {(["messages", "analytics"] as Tab[]).map((tab) => (
+          {tabs.map((tab) => (
             <button
-              key={tab}
-              id={`tab-${tab}`}
-              onClick={() => setActiveTab(tab)}
+              key={tab.id}
+              id={`tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
               className={[
                 "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all",
-                activeTab === tab
-                  ? "gradient-bg text-white shadow-md"
+                activeTab === tab.id
+                  ? tab.id === "starred"
+                    ? "bg-amber-500/20 text-amber-400 shadow-md border border-amber-500/25"
+                    : "gradient-bg text-white shadow-md"
                   : "text-muted-foreground hover:text-foreground hover:bg-white/8",
               ].join(" ")}
             >
-              {tab === "messages" ? (
-                <>
-                  <Inbox className="h-4 w-4" />
-                  Messages
-                  {messages.length > 0 && (
-                    <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                      activeTab === "messages" ? "bg-white/20 text-white" : "bg-white/10 text-muted-foreground"
-                    }`}>
-                      {messages.length}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <>
-                  <BarChart2 className="h-4 w-4" />
-                  Analytics
-                </>
+              {tab.icon}
+              {tab.label}
+              {tab.badge !== undefined && (
+                <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                  activeTab === tab.id
+                    ? tab.id === "starred"
+                      ? "bg-amber-500/30 text-amber-300"
+                      : "bg-white/20 text-white"
+                    : "bg-white/10 text-muted-foreground"
+                }`}>
+                  {tab.badge}
+                </span>
               )}
             </button>
           ))}
         </div>
 
-        {/* ── Tab content ──────────────────────────────────────────────────── */}
-        {activeTab === "messages" && (
+        {/* ── Tab content ─────────────────────────────────────────────────── */}
+        {activeTab !== "analytics" && (
           <>
             <div className="mb-4 flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                {messages.length === 0
-                  ? "No messages yet — share your link!"
-                  : `${messages.length} message${messages.length !== 1 ? "s" : ""}`}
+                {activeTab === "starred"
+                  ? starredCount === 0
+                    ? "No starred messages yet — tap ★ on a card"
+                    : `${starredCount} starred message${starredCount !== 1 ? "s" : ""}`
+                  : messages.length === 0
+                    ? "No messages yet — share your link!"
+                    : `${messages.length} message${messages.length !== 1 ? "s" : ""}`}
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                id="refresh-messages-btn"
-                onClick={(e) => {
-                  e.preventDefault();
-                  fetchMessages(true);
-                }}
-                className="h-8 gap-1.5 rounded-xl border-white/15 bg-white/5 text-xs hover:bg-white/10"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCcw className="h-3.5 w-3.5" />
-                )}
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
+              {activeTab === "messages" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  id="refresh-messages-btn"
+                  onClick={(e) => { e.preventDefault(); fetchMessages(true); }}
+                  className="h-8 gap-1.5 rounded-xl border-white/15 bg-white/5 text-xs hover:bg-white/10"
+                >
+                  {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {messages.length > 0 ? (
-                messages.map((message) => (
+              {displayMessages.length > 0 ? (
+                displayMessages.map((message) => (
                   <MessageCard
                     key={message._id}
                     message={message}
                     onMessageDelete={handleDeleteMessage}
+                    onMessageUpdate={handleMessageUpdate}
                   />
                 ))
               ) : (
                 <div className="col-span-full glass-card flex flex-col items-center justify-center gap-3 py-16 text-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/8 border border-white/10">
-                    <Inbox className="h-7 w-7 text-muted-foreground" />
+                  <div className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${
+                    activeTab === "starred"
+                      ? "bg-amber-500/10 border-amber-500/15"
+                      : "bg-white/8 border-white/10"
+                  }`}>
+                    {activeTab === "starred"
+                      ? <Star className="h-7 w-7 text-amber-400" />
+                      : <Inbox className="h-7 w-7 text-muted-foreground" />}
                   </div>
-                  <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
-                  <p className="text-xs text-muted-foreground">Share your link to start receiving anonymous feedback.</p>
-                  <Button
-                    size="sm"
-                    onClick={copyToClipboard}
-                    className="mt-2 shine-btn gradient-bg border-0 text-white rounded-xl"
-                  >
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
-                    Copy your link
-                  </Button>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {activeTab === "starred" ? "No starred messages" : "No messages yet"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {activeTab === "starred"
+                      ? "Tap the ★ icon on any message to star it."
+                      : "Share your link to start receiving anonymous feedback."}
+                  </p>
+                  {activeTab === "messages" && (
+                    <Button
+                      size="sm"
+                      onClick={copyToClipboard}
+                      className="mt-2 shine-btn gradient-bg border-0 text-white rounded-xl"
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy your link
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

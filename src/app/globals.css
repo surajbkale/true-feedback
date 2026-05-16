@@ -229,7 +229,7 @@
 /* ── Swipe card (swipe-to-delete) ────────────────────────────────────────── */
 .swipe-card-wrapper {
   position: relative;
-  overflow: hidden;
+  overflow: clip; /* clips sliding card but NOT out-of-flow positioned elements (emoji picker) */
   border-radius: var(--radius);
   touch-action: pan-y;
 }
@@ -242,7 +242,7 @@
   right: 0;
   top: 0;
   bottom: 0;
-  width: 80px;
+  width: 88px;
   display: flex;
   align-items: center;
   justify-content: center;
